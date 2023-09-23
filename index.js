@@ -7,6 +7,12 @@ let hours = currentTime.getHours();
 let minutes = currentTime.getMinutes();
 let time = hours + ":" + minutes;
 
+const movies = [
+  { title: 'Jaws', year: 1975, rating: 8 },
+  { title: 'Avatar', year: 2009, rating: 7.8 },
+  { title: 'Brazil', year: 1985, rating: 8 },
+  { title: 'الإرهاب والكباب‎', year: 1992, rating: 6.2 }
+]
 
 app.get('/test', (req, res) => {
     res.send({status:200, message:"ok"});
@@ -27,5 +33,26 @@ app.get('/test', (req, res) => {
       res.send({ status: 500, error: true, message: "you have to provide a search" });
     }
   });
+
+
+  app.get('/movies/add', (req, res) => {
+    res.send({status:200, message:ID});
+  });
+
+
+  app.get('/movies/get', (req, res) => {
+    res.send({status:200, data:movies.map(movie=>movie.title)});
+  });
+
+
+  app.get('/movies/edit', (req, res) => {
+    res.send({status:200, message:ID});
+  });
+
+
+  app.get('/movies/delete', (req, res) => {
+    res.send({status:200, message:ID});
+  });
+
 
 app.listen(3000);
