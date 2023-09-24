@@ -23,13 +23,16 @@ app.get('/', (req, res) => {
 app.get('/test', (req, res) => {
     res.send({status:200, message:"ok"});
   });
+
   app.get('/time', (req, res) => {
     res.send({status:200, message:time});
   });
+
   app.get('/hello/:ID', (req, res) => {
     const ID  = req.params.ID
     res.send({status:200, message:ID});
   });
+
   app.get('/search', (req, res) => {
     const SEARCH = req.query.s;
     if (SEARCH !== "") {
@@ -44,6 +47,7 @@ app.get('/test', (req, res) => {
   app.get('/movies/add', (req, res) => {
     res.send({status:200, message:ID});
   });
+
 
 
   app.get('/movies/get', (req, res) => {
@@ -63,11 +67,25 @@ app.get('/test', (req, res) => {
     const sortedMovies = movies.slice().sort((a, b) => a.title.localeCompare(b.title));
     res.send({ status: 200, data: sortedMovies });
   });
-
+  app.get('/movies/get/id/:ID', (req, res) => {
+    const ID = req.params.ID;
+    let flag = false;
+    for (let i = 0; i < movies.length; i++) {
+      if (ID === movies[i].title) {
+        flag = true;
+        res.send({ status: 200, data: movies[i] });
+        break;
+      }
+    }
+    if (!flag) {
+      res.status(404).send({ status: 404, error: true, message: 'The movie does not exist' });
+    }
+  });
 
   app.get('/movies/edit', (req, res) => {
     res.send({status:200, message:ID});
   });
+
 
 
   app.get('/movies/delete', (req, res) => {
