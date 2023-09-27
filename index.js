@@ -1,13 +1,14 @@
 const express = require("express");
-const req = require("express/lib/request");
-const app = express(); // the server named app
+const app = express();
 
-let currentTime = new Date(); // here we used the curretTime  to get the real time based on your device
+app.use(express.json()); // Required to parse JSON data
+
+let currentTime = new Date();
 let hours = currentTime.getHours();
 let minutes = currentTime.getMinutes();
 let time = hours + ":" + minutes;
 
-class Movie {  // this is a class named movie, i used it in when i want to add a movie, just use the "new" and it will be declared as object.
+class Movie {
   constructor(title, year, rating) {
     this.title = title;
     this.year = year;
@@ -44,8 +45,7 @@ app.get("/search", (req, res) => {
   if (SEARCH !== "") {
     res.send({ status: 200, message: "ok", data: SEARCH });
   } else {
-    res.status(500);
-    res.send({
+    res.status(500).send({
       status: 500,
       error: true,
       message: "you have to provide a search",
@@ -53,129 +53,91 @@ app.get("/search", (req, res) => {
   }
 });
 
+app.post("/movies", (req, res) => {
+  const title = req.body.title;
+  const year = req.body.year;
+  const rating = req.body.rating || 4;
 
-app.get("/movies/add", (req, res) => {
-  if (!req.query.title || !req.query.year) { // here we check if the year or title are missing,if they are it will display the message
-    res.send({status:403,message: "you cannot create a movie without providing a title and a year",
+  if (!title || !year) {
+    res.status(403).send({
+      status: 403,
+      message: "You cannot create a movie without providing a title and a year",
     });
+    return;
   }
 
+  const movie = new Movie(title, year, rating);
+  movies.push(movie);
 
-  let movie = new Movie(  //here instead of getting variables and using like 10 lines of code i just used the class and constructor, with the "new" following the name of the class u can declare it
-    req.query.title,
-    req.query.year,
-    req.query.rating ? req.query.rating : 4
-  );
-
-  movies.push(movie);  // and then here we push it to the main array of objects :)
-  res.send({ status: 200, message: movies }); // and here we display the main array after pushing, to check if it is pushed succefully
+  res.send({ status: 200, message: "Movie added successfully", data: movie });
 });
 
-app.get("/movies/get", (req, res) => {
+app.get("/movies", (req, res) => {
   res.send({ status: 200, data: movies.map((movie) => movie.title) });
 });
-app.get("/movies/get/by-date", (req, res) => {
-  const sortedMovies = movies.slice().sort((a, b) => a.year - b.year); // here we used a and b to compare between each object year and sort them into sorten movies then display it
+
+app.get("/movies/by-date", (req, res) => {
+  const sortedMovies = movies.slice().sort((a, b) => a.year - b.year);
   res.send({ status: 200, data: sortedMovies });
 });
 
-app.get("/movies/get/by-rating", (req, res) => {  // same as year but here by rating
+app.get("/movies/by-rating", (req, res) => {
   const sortedMovies = movies.slice().sort((a, b) => b.rating - a.rating);
   res.send({ status: 200, data: sortedMovies });
 });
 
-app.get("/movies/get/by-title", (req, res) => {
+app.get("/movies/by-title", (req, res) => {
   const sortedMovies = movies
     .slice()
-    .sort((a, b) => a.title.localeCompare(b.title));  // same but here we are comparing the titles, they will be displayed alphabetically
+    .sort((a, b) => a.title.localeCompare(b.title));
   res.send({ status: 200, data: sortedMovies });
 });
 
-app.get("/movies/get/id/:ID", (req, res) => {
+app.get("/movies/:ID", (req, res) => {
   const ID = req.params.ID;
-  let flag = false;
-  for (let i = 0; i < movies.length; i++) {
-    if (ID === movies[i].id) {
-      flag = true;
-      res.send({ status: 200, data: movies[i] });
-      break;
-    }
-  }
-  if (!flag) {
-    res
-      .status(404)
-      .send({ status: 404, error: true, message: "Movie not found" });
+  const movie = movies.find((movie) => movie.title === ID);
+
+  if (movie) {
+    res.send({ status: 200, data: movie });
+  } else {
+    res.status(404).send({ status: 404, error: true, message: "Movie not found" });
   }
 });
 
-app.get("/movies/delete/:ID", (req, res) => {  // here we are using the user input and deleting the movie based on it, in this case i chose the title of the movie,
-  let ID = req.params.ID;
-  ID = ID.replace(":", ""); // Remove leading colon from the ID, it was dealing some problems for me with the comparison
-  let movieIndex = -1;
-
-  for (let i = 0; i < movies.length; i++) {
-    if (ID === movies[i].title) { 
-      movieIndex = i;
-      break;
-    }
-  }
+app.delete("/movies/:ID", (req, res) => {
+  const ID = req.params.ID;
+  const movieIndex = movies.findIndex((movie) => movie.title === ID);
 
   if (movieIndex !== -1) {
     movies.splice(movieIndex, 1);
-    res.send({ status: 200, data: movies });
+    res.send({ status: 200, message: "Movie deleted successfully" });
   } else {
-    res
-      .status(404)
-      .send({ status: 404, error: true, message: `The movie "${ID}" does not exist` });
+    res.status(404).send({
+      status: 404,
+      error: true,
+      message: `The movie "${ID}" does not exist`,
+    });
   }
 });
 
-app.get("/movies/update/:ID", (req, res) => {
+app.put("/movies/:ID", (req, res) => {
   const ID = req.params.ID;
-  const newTitle = req.query.title;
+  const newTitle = req.body.title;
+  const newRating = req.body.rating;
 
-  let updatedMovies = [];
+  const movieIndex = movies.findIndex((movie) => movie.title === ID);
 
-  for (let i = 0; i < movies.length; i++) {
-    if (ID === movies[i].title) {
-      const updatedMovie = {
-        ...movies[i],
-        title: newTitle ? newTitle : movies[i].title,
-      };
-      updatedMovies.push(updatedMovie);
-    } else {
-      updatedMovies.push(movies[i]);
-    }
+  if (movieIndex !== -1) {
+    const movie = movies[movieIndex];
+    movie.title = newTitle || movie.title;
+   movie.rating = newRating || movie.rating;
+
+    res.send({ status: 200, message: "Movie updated successfully", data: movie });
+  } else {
+    res.status(404).send({ status: 404, error: true, message: "Movie not found" });
   }
-
-  movies = [...updatedMovies];
-
-  res.send({ status: 200, data: movies });
 });
 
-app.get("/movies/update/:ID", (req, res) => {
-  const ID = req.params.ID;
-  const newTitle = req.query.title;
-  const newRating = req.query.rating;
-
-  let updatedMovies = [];
-
-  for (let i = 0; i < movies.length; i++) {
-    if (ID === movies[i].title) {
-      const updatedMovie = {
-        ...movies[i],
-        title: newTitle ? newTitle : movies[i].title,
-        rating: newRating ? newRating : movies[i].rating,
-      };
-      updatedMovies.push(updatedMovie);
-    } else {
-      updatedMovies.push(movies[i]);
-    }
-  }
-
-  movies = [...updatedMovies];
-
-  res.send({ status: 200, data: movies });
+app.listen(3000, () => {
+  console.log("Server is listening on port 3000");
 });
-
-app.listen(3000);
