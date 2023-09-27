@@ -106,7 +106,25 @@ app.get("/movies/get/id/:ID", (req, res) => {
   }
 });
 
-app.get("/movies/delete", (req, res) => {
-  res.send({ status: 200, message: ID });
+app.get("/movies/delete/:ID", (req, res) => {
+  let ID = req.params.ID;
+  ID = ID.replace(":", ""); // Remove leading colon from the ID
+  let movieIndex = -1;
+
+  for (let i = 0; i < movies.length; i++) {
+    if (ID === movies[i].title) { 
+      movieIndex = i;
+      break;
+    }
+  }
+
+  if (movieIndex !== -1) {
+    movies.splice(movieIndex, 1);
+    res.send({ status: 200, data: movies });
+  } else {
+    res
+      .status(404)
+      .send({ status: 404, error: true, message: `The movie "${ID}" does not exist` });
+  }
 });
 app.listen(3000);
