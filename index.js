@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 require('dotenv').config();
-const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 app.use(express.json());
 
@@ -10,14 +10,42 @@ let hours = currentTime.getHours();
 let minutes = currentTime.getMinutes();
 let time = hours + ':' + minutes;
 
-// Movie model
-const movieSchema = new mongoose.Schema({
-  title: String,
-  year: Number,
-  rating: Number,
-});
+const users = [
+  { username: 'John', password: '1234' },
+  { username: 'Jane', password: '5678' }
+];
 
-const Movie = mongoose.model('Movie', movieSchema);
+const movies = [];
+
+const authenticateUser = (req, res, next) => {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    res.status(401).send({ status: 401, error: true, message: 'Unauthorized' });
+    return;
+  }
+
+  try {
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    res.status(401).send({ status: 401, error: true, message: 'Invalid token' });
+  }
+};
+
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+
+  const user = users.find(user => user.username === username && user.password === password);
+
+  if (user) {
+    const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET);
+    res.send({ status: 200, message: 'Login successful', token });
+  } else {
+    res.status(401).send({ status: 401, error: true, message: 'Invalid credentials' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send({ status: 200, message: 'Hello there' });
@@ -44,120 +72,90 @@ app.get('/search', (req, res) => {
     res.status(500).send({
       status: 500,
       error: true,
-      message: 'you have to provide a search',
+      message: 'You have to provide a search'
     });
   }
 });
 
-app.post('/movies', (req, res) => {
+app.post('/movies', authenticateUser, (req, res) => {
   const { title, year, rating } = req.body;
 
   if (!title || !year) {
     res.status(403).send({
       status: 403,
-      message: 'You cannot create a movie without providing a title and a year',
+      message: 'You cannot create a movie without providing a title and a year'
     });
     return;
   }
 
-  const movie = new Movie({
+  const movie = {
     title,
     year,
-    rating: rating || 4,
-  });
+    rating: rating || 4
+  };
 
-  movie
-    .save()
-    .then((savedMovie) => {
-      res.send({ status: 200, message: 'Movie added successfully', data: savedMovie });
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  movies.push(movie);
+
+  res.send({ status: 200, message: 'Movie added successfully', data: movie });
 });
 
 app.get('/movies', (req, res) => {
-  Movie.find()
-    .then((movies) => {
-      res.send({ status: 200, data: movies.map((movie) => movie.title) });
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  res.send({ status: 200, data: movies });
 });
 
 app.get('/movies/by-date', (req, res) => {
-  Movie.find().sort({ year: 1 })
-    .then((sortedMovies) => {
-      res.send({ status: 200, data: sortedMovies });
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  const sortedMovies = [...movies].sort((a, b) => a.year - b.year);
+  res.send({ status: 200, data: sortedMovies });
 });
 
 app.get('/movies/by-rating', (req, res) => {
-  Movie.find().sort({ rating: -1 })
-    .then((sortedMovies) => {
-      res.send({ status: 200, data: sortedMovies });
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  const sortedMovies = [...movies].sort((a, b) => b.rating - a.rating);
+  res.send({ status: 200, data: sortedMovies });
 });
 
 app.get('/movies/by-title', (req, res) => {
-  Movie.find().sort({ title: 1 })
-    .then((sortedMovies) => {
-      res.send({ status: 200, data: sortedMovies });
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  const sortedMovies = [...movies].sort((a, b) => a.title.localeCompare(b.title));
+  res.send({ status: 200, data: sortedMovies });
 });
 
 app.get('/movies/:ID', (req, res) => {
   const ID = req.params.ID;
+  const movie = movies.find(movie => movie.title === ID);
 
-  Movie.findById(ID)
-    .then((movie) => {
-      if (movie) {
-        res.send({ status: 200, data: movie });
-      } else {
-        res.status(404).send({ status: 404, error: true, message: 'Movie not found' });
-      }
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  if (movie) {
+    res.send({ status: 200, data: movie });
+  } else {
+    res.status(404).send({ status: 404, error: true, message: 'Movie not found' });
+  }
 });
 
-app.delete('/movies/:ID', (req, res) => {
+app.put('/movies/:ID', authenticateUser, (req, res) => {
+  const ID = req.params.ID;
+  const updatedMovie = req.body;
+
+  const movieIndex = movies.findIndex(movie => movie.title === ID);
+
+  if (movieIndex !== -1) {
+    movies[movieIndex] = { ...movies[movieIndex], ...updatedMovie };
+    res.send({ status: 200, message: 'Movie updated successfully', data: movies[movieIndex] });
+  } else {
+    res.status(404).send({ status: 404, error: true, message: 'Movie not found' });
+  }
+});
+
+app.delete('/movies/:ID', authenticateUser, (req, res) => {
   const ID = req.params.ID;
 
-  Movie.findByIdAndDelete(ID)
-    .then((deletedMovie) => {
-      if (deletedMovie) {
-        res.send({ status: 200, message: 'Movie deleted successfully' });
-      } else {
-        res.status(404).send({ status: 404, error: true, message: 'Movie not found' });
-      }
-    })
-    .catch((error) => {
-      res.status(500).send({ status: 500, error: true, message: error.message });
-    });
+  const movieIndex = movies.findIndex(movie => movie.title === ID);
+
+  if (movieIndex !== -1) {
+    movies.splice(movieIndex, 1);
+    res.send({ status: 200, message: 'Movie deleted successfully' });
+  } else {
+    res.status(404).send({ status: 404, error: true, message: 'Movie not found' });
+  }
 });
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(() => {
-    console.log('Connected to MongoDB');
-    app.listen(process.env.PORT || 3000, () => {
-      console.log('Server is running');
-    });
-  })
-  .catch((error) => {
-    console.log('Failed to connect to MongoDB:', error.message);
-  });
+app.listen(3000, () => {
+  console.log('Server started on port 3000');
+});
